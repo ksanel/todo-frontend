@@ -59,7 +59,7 @@ function TodoListPage() {
                         <><SignalLow className='text-success'/> <h1 className='text-success'>Low</h1></>
                     }
                 </TableCell>
-                <TableCell className='text-danger'><Button variant='ghost' color='danger'><Trash2 /></Button></TableCell>
+                <TableCell className='text-danger'><Button variant='ghost' color='danger' onClick={() => deleteTodo(row.id)} ><Trash2 /></Button></TableCell>
             </TableRow>
         )
     }, []);
@@ -103,13 +103,70 @@ function TodoListPage() {
         })
     }
 
+    // Delete List
+    const deleteList = () => {
+        console.log("delete list")
+        fetch(`https://localhost:7049/api/list/${id}`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        })
+        .finally(() => {
+            // render again
+            backToPage();
+        })
+        .catch(err => {
+            console.log(err)
+        })
+    }
+
+    // Delete Todo
+    const deleteTodo = (itemid: string) => {
+        console.log("delete")
+        fetch(`https://localhost:7049/api/todo/${itemid}`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        })
+        .finally(() => {
+            // render again
+            setIsLoading(true);
+            fetch(`https://localhost:7049/api/list/${id}/todos?limit=${rowsPerPage}&skip=${(page - 1) * rowsPerPage}`)
+            .then(res => res.json())
+            .then(data => {
+                console.log(data)
+                item.current.data = data;
+                setIsLoading(false);
+                setIsError(false);
+            })
+            .catch(err => {
+                setIsLoading(false);
+                setIsError(true);
+            })
+        })
+        .catch(err => {
+            console.log(err)
+        })
+    }
+
     // Update Todo
     const updateTodo = (itemid: string, e: any) => {
-        // put data to api
+        // get todo data
+        let todo: any = {};
+        todo = item.current.data.todos.find((item: any) => item.id === itemid);
+        console.log(item.current.data.todos.find((item: any) => item.id === itemid))
+        // data
         const data ={
+            "id": todo.id,
+            "text": todo.text,
             "isCompleted": e,
+            "status": todo.status,
+            "listId": todo.listId
         }
 
+        // put todo
         fetch(`https://localhost:7049/api/todo/${itemid}`, {
             method: 'PUT',
             headers: {
@@ -210,15 +267,21 @@ function TodoListPage() {
                     <p>Todo Lists</p>
                 </CardBody>
             </Card>
-            <Card className='flex items-center col-span-4'>
+            <Card className='flex items-center col-span-3'>
                 <CardBody>
-                    <p className='text-2xl font-semibold'>Market Alışverişi</p>
+                    <p className='text-2xl font-semibold'>{item.current.list.name}</p>
                 </CardBody>
             </Card>
             <Card isPressable className='flex items-center' onPress={onOpen}>
                 <CardBody>
                     <Plus />
                     <p>Create Todo</p>
+                </CardBody>
+            </Card>
+            <Card isPressable className='flex items-center bg-red-300' onPress={deleteList}>
+                <CardBody>
+                    <Trash2 />
+                    <p>Delete List</p>
                 </CardBody>
             </Card>
             <Table aria-label="Example empty table" className='col-span-6'

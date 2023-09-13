@@ -1,10 +1,10 @@
+import { type } from "os";
+
 interface TodoList {id: string;}
 
 interface TodoLists {
-    todoLists: TodoList[],
-    total: number,
-    skip: number,
-    limit: number,
+    lists: TodoList[],
+    total: number
 }
 
 interface TodoList {
@@ -35,4 +35,11 @@ type TodosResponse = {
     list: TodoList;
 }
 
-export type {TodoList, Todos, Todo, TodosResponse};
+type  TodoListsResponse = {
+    data: TodoLists;
+    isLoading: boolean;
+    isError: boolean;
+    mutate: any;
+}
+
+export type {TodoList, Todos, Todo, TodosResponse, TodoListsResponse};
