@@ -1,13 +1,17 @@
 import React, { useState, useEffect, useReducer, useRef } from 'react';
 import HomeLayout from "../layouts/HomeLayout"
 import { useParams } from 'react-router-dom';
-import {Pagination, Table, TableHeader, TableColumn, TableBody, TableRow, TableCell, Card, CardBody, useDisclosure, Modal, ModalFooter, ModalContent, ModalHeader, ModalBody, Input, Button, Checkbox, Spinner} from "@nextui-org/react";
-import { Plus, ListTodo, ChevronLeft, Trash2 } from 'lucide-react';
+import {Pagination, Table, TableHeader, TableColumn, TableBody, TableRow, TableCell, Card, CardBody, useDisclosure, Modal, ModalFooter, ModalContent, ModalHeader, ModalBody, Input, Button, Checkbox, Spinner, Select, SelectItem} from "@nextui-org/react";
+import { Plus, ListTodo, ChevronLeft, Trash2, SignalHigh, SignalMedium, SignalLow } from 'lucide-react';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { TodoList, Todos, Todo, TodosResponse } from '../utils/types';
 
-const complated = (state: any) => {return (<Checkbox defaultSelected={state}/>)}
+const priority = [
+    {label: "Urgent", value: "Urgent"},
+    {label: "Meduim", value: "Meduim"},
+    {label: "Low", value: "Low"},
+]
 
 function TodoListPage() {
     const {id} = useParams<TodoList | any>();
@@ -16,6 +20,7 @@ function TodoListPage() {
     const [isLoading, setIsLoading] = useState(false);
     const [isError, setIsError] = useState(false);
     const [newTodo, setNewTodo] = useState('');
+    const [newTodoPriority, setNewTodoPriority] = useState('');
     const [isAdded, setIsAdded] = useState(false);
     const rowsPerPage = 15;
     
@@ -30,11 +35,30 @@ function TodoListPage() {
         theme: "light",
     });
 
+    const complated = (state: any, id: string) => {
+        return (
+            <Checkbox defaultSelected={state} onValueChange={(e) => handleCheckboxChange(e, id)} />
+        )
+    }
+
+    const handleCheckboxChange = (e: any, id: any) => {
+        updateTodo(id, e);
+    }
+
     const renderCell = React.useCallback((row: Todo) => {
         return (
             <TableRow key={row.id}>
-                <TableCell>{complated(row.completed)}</TableCell>
-                <TableCell>{row.todo}</TableCell>
+                <TableCell>{complated(row.isCompleted, row.id)}</TableCell>
+                <TableCell>{row.text}</TableCell>
+                <TableCell>
+                    {row.status === "Urgent" ? 
+                        <><SignalHigh className='text-danger'/><h1 className='text-danger'>Urgent</h1></>
+                        : row.status === "Meduim" ? 
+                        <><SignalMedium className='text-warning'/><h1 className='text-warning'>Medium</h1></>
+                        : 
+                        <><SignalLow className='text-success'/> <h1 className='text-success'>Low</h1></>
+                    }
+                </TableCell>
                 <TableCell className='text-danger'><Button variant='ghost' color='danger'><Trash2 /></Button></TableCell>
             </TableRow>
         )
@@ -42,21 +66,69 @@ function TodoListPage() {
 
     // Add Todo
     const addTodo = () => {
-        const data = {todo: newTodo, completed: false, userId: 1};
+        const data ={
+            "id": 0,
+            "text": newTodo,
+            "isCompleted": false,
+            "status": newTodoPriority,
+            "listId": id
+        }
         setIsAdded(true);
-        return fetch("https://dummyjson.com/todos/add", {
+        fetch(`https://localhost:7049/api/todo`, {
             method: 'POST',
             headers: {
-                'Content-type': 'application/json',
+                'Content-Type': 'application/json',
             },
             body: JSON.stringify(data),
         })
-        .then(res => res.json())
-        .then(data => setPage(1))
-        .then(() => isOpen ? onOpenChange() : null)
-        .then(() => notify())
-        .then(() => setIsAdded(false))
-        .catch(err => console.log(err))
+        .then(res => {
+            if (!res.ok) {
+                throw new Error("Network response was not ok");
+            }
+            return res.json();
+        })
+        .then(data => {
+            console.log(data);
+            notify();
+            setIsAdded(false);
+            setNewTodoPriority('');
+            setNewTodo('');
+            onOpenChange();
+            setIsLoading(true);
+            item.current.data.todos.push(data);
+            setIsLoading(false);
+        })
+        .catch(err => {
+            console.log(err)
+        })
+    }
+
+    // Update Todo
+    const updateTodo = (itemid: string, e: any) => {
+        // put data to api
+        const data ={
+            "isCompleted": e,
+        }
+
+        fetch(`https://localhost:7049/api/todo/${itemid}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(data),
+        })
+        .then(res => {
+            if (!res.ok) {
+                throw new Error("Network response was not ok");
+            }
+            return res.json();
+        })
+        .then(data => {
+            console.log(data);
+        })
+        .catch(err => {
+            console.log(err)
+        })
     }
 
     // get data from api
@@ -65,14 +137,42 @@ function TodoListPage() {
         isLoading: false,
         isError: false,
         mutate: null,
+        list: {id: '0', name: ''}
     });
 
     useEffect(() => {
         setIsLoading(true);
         setIsError(false);
-        fetch(`https://dummyjson.com/todos?limit=${rowsPerPage}&skip=${(page - 1) * rowsPerPage}`)
+
+        if (!id) {
+            backToPage();
+        }
+
+        // Control the list id exists
+        fetch(`https://localhost:7049/api/list/` + id)
+        .then(res => {
+            if (!res.ok) {
+                throw new Error("Network response was not ok");
+            }
+            return res.json();
+        })
+        .then(data => {
+            console.log(data);
+            if (data.id === undefined) {
+                console.log("undefined error");
+            } else {
+                item.current.list = data;
+            }
+        })
+        .catch(err => {
+            console.log(err)
+        })
+
+
+        fetch(`https://localhost:7049/api/list/${id}/todos?limit=${rowsPerPage}&skip=${(page - 1) * rowsPerPage}`)
         .then(res => res.json())
         .then(data => {
+            console.log(data)
             item.current.data = data;
             setIsLoading(false);
             setIsError(false);
@@ -142,6 +242,7 @@ function TodoListPage() {
                 <TableHeader>
                     <TableColumn>Status</TableColumn>
                     <TableColumn>Todo</TableColumn>
+                    <TableColumn>Priority</TableColumn>
                     <TableColumn>Action</TableColumn>
                 </TableHeader>
                 <TableBody 
@@ -162,7 +263,8 @@ function TodoListPage() {
                     <>
                     <ModalHeader className="flex flex-col gap-1">Add Todo</ModalHeader>
                     <ModalBody>
-                        {isAdded ? <Spinner size="lg" /> : 
+                        {isAdded ? <Spinner size="lg" /> :
+                        <>
                             <Input
                             autoFocus
                             endContent={
@@ -173,6 +275,18 @@ function TodoListPage() {
                             variant="bordered"
                             onChange={(e) => setNewTodo(e.target.value)}
                             />
+                            <Select 
+                                label="Select an priority" 
+                                className="w-full" 
+                                onChange={(e) => setNewTodoPriority(e.target.value)}
+                            >
+                                {priority.map((item) => (
+                                <SelectItem key={item.value} value={item.value}>
+                                    {item.label}
+                                </SelectItem>
+                                ))}
+                            </Select>
+                        </>                
                         }
                     </ModalBody>
                     <ModalFooter>
